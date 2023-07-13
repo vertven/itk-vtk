@@ -1,20 +1,22 @@
 import vtk
 import itk
 
-def render(images):
-    """ Renders multiple itk Images with VTK """
+def render(images, labels):
 
-    # Create a new render window
+    if len(images) != len(labels):
+        raise ValueError("Number of images and labels must be the same")
+
     renderWindow = vtk.vtkRenderWindow()
 
-    # Create a new window interactor
     renderWindowInteractor = vtk.vtkRenderWindowInteractor()
     renderWindowInteractor.SetRenderWindow(renderWindow)
     renderWindowInteractor.Initialize()
 
-    imageReslices = [] 
-    for i, itkImage in enumerate(images):
+    image_size = 1 / len(images)
 
+
+    imageReslices = [] 
+    for i, (itkImage, label) in enumerate(zip(images, labels)):
         array = itk.array_from_image(itkImage)
 
         # Normalize the array to range 0-255
@@ -42,10 +44,18 @@ def render(images):
         imageActor.GetMapper().SetInputData(reslice.GetOutput())
         renderer.AddActor(imageActor)
 
-        # Define the position of the renderer in the render window
-        renderer.SetViewport(i / len(images), 0, (i + 1) / len(images), 1)
+        cornerAnnotation = vtk.vtkCornerAnnotation()
+        cornerAnnotation.SetText(0, label) 
+        cornerAnnotation.GetTextProperty().SetFontSize(20)
+        cornerAnnotation.GetTextProperty().SetColor(1, 1, 1)
+        renderer.AddViewProp(cornerAnnotation)
 
         setupCamera(renderer, imageActor)
+
+        xMin = i * image_size
+        xMax = (i + 1) * image_size
+        renderer.SetViewport(xMin, 0, xMax, 1) 
+
 
     max_slice = source.GetDimensions()[2] - 1
     renderWindowInteractor.SetInteractorStyle(
@@ -92,8 +102,6 @@ def setupCamera(renderer, imageActor):
     """Configure active camera of renderer by fitting the data"""
 
     camera = renderer.GetActiveCamera()
-    renderer.ResetCamera()
-    camera.ParallelProjectionOn()
 
     source = imageActor.GetMapper().GetInput()
 
@@ -108,9 +116,12 @@ def setupCamera(renderer, imageActor):
 
     d = camera.GetDistance()
     scale_factor = 0.5 * ydimension
+
     camera.SetParallelScale(scale_factor)
     camera.SetFocalPoint(xcenter, ycenter, zcenter)
     camera.SetPosition(xcenter, ycenter, zcenter - d)
     camera.SetViewUp(0, -1, 0)
 
+    renderer.ResetCamera()
     renderer.ResetCameraClippingRange()
+
