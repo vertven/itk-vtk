@@ -1,28 +1,26 @@
 import vtk
 import itk
+from vtkmodules.util import numpy_support
 
-def render(images, labels):
+
+def render(images, labels, segmentations=None):
 
     if len(images) != len(labels):
         raise ValueError("Number of images and labels must be the same")
 
     renderWindow = vtk.vtkRenderWindow()
-
     renderWindowInteractor = vtk.vtkRenderWindowInteractor()
     renderWindowInteractor.SetRenderWindow(renderWindow)
     renderWindowInteractor.Initialize()
 
     image_size = 1 / len(images)
-
-
-    imageReslices = [] 
+    imageReslices = []
     for i, (itkImage, label) in enumerate(zip(images, labels)):
         array = itk.array_from_image(itkImage)
 
         # Normalize the array to range 0-255
         array = ((array - array.min()) * (1 / (array.max() - array.min()) * 255)).astype('uint8')
 
-        # Convert the normalized array back to an ITK image
         itkImage = itk.image_from_array(array)
 
         source = itk.vtk_image_from_image(itkImage)
@@ -35,17 +33,53 @@ def render(images, labels):
         reslice = vtk.vtkImageReslice()
         reslice.SetInputData(source)
         reslice.SetOutputDimensionality(2)
-        reslice.SetResliceAxesDirectionCosines([1, 0, 0, 0, 1, 0, 0, 0, 1]) 
-        reslice.SetResliceAxesOrigin([0, 0, 0]) 
+        reslice.SetResliceAxesDirectionCosines([1, 0, 0, 0, 1, 0, 0, 0, 1])
+        reslice.SetResliceAxesOrigin([0, 0, 0])
         reslice.Update()
         imageReslices.append(reslice)
 
         imageActor = vtk.vtkImageActor()
         imageActor.GetMapper().SetInputData(reslice.GetOutput())
+
+        if segmentations is not None:
+            segmentation = segmentations[i]
+
+            seg_array = itk.array_from_image(segmentation)
+            seg_array = (seg_array - seg_array.min()) / (seg_array.max() - seg_array.min())
+
+            seg_vtk = numpy_support.numpy_to_vtk(seg_array.ravel(), deep=True, array_type=vtk.VTK_UNSIGNED_CHAR)
+            seg_image = vtk.vtkImageData()
+            seg_image.SetSpacing(itkImage.GetSpacing())
+            seg_image.SetOrigin(itkImage.GetOrigin())
+            seg_image.SetDimensions(*itkImage.GetLargestPossibleRegion().GetSize())
+            seg_image.SetSpacing(*itkImage.GetSpacing())
+            size = itkImage.GetLargestPossibleRegion().GetSize()
+            seg_image.SetDimensions(size[0], size[1], size[2])
+            seg_image.GetPointData().SetScalars(seg_vtk)
+
+            # Map the segmented image to red color
+            colorLookupTable = vtk.vtkLookupTable()
+            colorLookupTable.SetNumberOfTableValues(2)
+            colorLookupTable.SetTableValue(0, 0, 0, 0, 0)
+            colorLookupTable.SetTableValue(1, 1, 0, 0, 1)
+            colorLookupTable.Build()
+
+            mapTransparency = vtk.vtkImageMapToColors()
+            mapTransparency.SetLookupTable(colorLookupTable)
+            mapTransparency.PassAlphaToOutputOn()
+            mapTransparency.SetInputData(seg_image)
+            mapTransparency.Update()
+
+            seg_actor = vtk.vtkImageActor()
+            seg_actor.GetMapper().SetInputData(mapTransparency.GetOutput())
+            seg_actor.GetProperty().SetOpacity(0.5)
+
+            renderer.AddActor(seg_actor)
+
         renderer.AddActor(imageActor)
 
         cornerAnnotation = vtk.vtkCornerAnnotation()
-        cornerAnnotation.SetText(0, label) 
+        cornerAnnotation.SetText(0, label)
         cornerAnnotation.GetTextProperty().SetFontSize(20)
         cornerAnnotation.GetTextProperty().SetColor(1, 1, 1)
         renderer.AddViewProp(cornerAnnotation)
@@ -54,7 +88,7 @@ def render(images, labels):
 
         xMin = i * image_size
         xMax = (i + 1) * image_size
-        renderer.SetViewport(xMin, 0, xMax, 1) 
+        renderer.SetViewport(xMin, 0, xMax, 1)
 
 
     max_slice = source.GetDimensions()[2] - 1
