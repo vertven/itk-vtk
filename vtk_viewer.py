@@ -1,80 +1,84 @@
 import vtk
 import itk
+import math
+
+import vtk
+import itk
+import math
 
 def render(images, labels):
-
     if len(images) != len(labels):
         raise ValueError("Number of images and labels must be the same")
 
-    renderWindow = vtk.vtkRenderWindow()
+    render_window = vtk.vtkRenderWindow()
 
-    renderWindowInteractor = vtk.vtkRenderWindowInteractor()
-    renderWindowInteractor.SetRenderWindow(renderWindow)
-    renderWindowInteractor.Initialize()
+    render_window_interactor = vtk.vtkRenderWindowInteractor()
+    render_window_interactor.SetRenderWindow(render_window)
+    render_window_interactor.Initialize()
 
-    image_size = 1 / len(images)
+    total_images = len(images)
+    image_size = 1 / total_images
 
-
-    imageReslices = [] 
-    for i, (itkImage, label) in enumerate(zip(images, labels)):
-        array = itk.array_from_image(itkImage)
+    image_reslices = []
+    for i, (itk_image, label) in enumerate(zip(images, labels)):
+        array = itk.array_from_image(itk_image)
 
         # Normalize the array to range 0-255
-        array = ((array - array.min()) * (1 / (array.max() - array.min()) * 255)).astype('uint8')
+        array = ((array - array.min()) * (1 / (array.max() - array.min()) * 255)).astype('uint32')
 
         # Convert the normalized array back to an ITK image
-        itkImage = itk.image_from_array(array)
+        itk_image = itk.image_from_array(array)
 
-        source = itk.vtk_image_from_image(itkImage)
+        source = itk.vtk_image_from_image(itk_image)
 
         renderer = vtk.vtkRenderer()
         renderer.GetActiveCamera().ParallelProjectionOn()
 
-        renderWindow.AddRenderer(renderer)
+        render_window.AddRenderer(renderer)
 
         reslice = vtk.vtkImageReslice()
         reslice.SetInputData(source)
         reslice.SetOutputDimensionality(2)
-        reslice.SetResliceAxesDirectionCosines([1, 0, 0, 0, 1, 0, 0, 0, 1]) 
-        reslice.SetResliceAxesOrigin([0, 0, 0]) 
+        reslice.SetResliceAxesDirectionCosines([1, 0, 0, 0, 1, 0, 0, 0, 1])
+        reslice.SetResliceAxesOrigin([0, 0, 0])
         reslice.Update()
-        imageReslices.append(reslice)
+        image_reslices.append(reslice)
 
-        imageActor = vtk.vtkImageActor()
-        imageActor.GetMapper().SetInputData(reslice.GetOutput())
-        renderer.AddActor(imageActor)
+        image_actor = vtk.vtkImageActor()
+        image_actor.GetMapper().SetInputData(reslice.GetOutput())
+        renderer.AddActor(image_actor)
 
-        cornerAnnotation = vtk.vtkCornerAnnotation()
-        cornerAnnotation.SetText(0, label) 
-        cornerAnnotation.GetTextProperty().SetFontSize(20)
-        cornerAnnotation.GetTextProperty().SetColor(1, 1, 1)
-        renderer.AddViewProp(cornerAnnotation)
+        corner_annotation = vtk.vtkCornerAnnotation()
+        corner_annotation.SetText(0, label)
+        corner_annotation.GetTextProperty().SetFontSize(20)
+        corner_annotation.GetTextProperty().SetColor(1, 1, 1)
+        renderer.AddViewProp(corner_annotation)
 
-        setupCamera(renderer, imageActor)
+        setup_camera(renderer, image_actor, total_images)
 
-        xMin = i * image_size
-        xMax = (i + 1) * image_size
-        renderer.SetViewport(xMin, 0, xMax, 1) 
-
+        x_min = i * image_size
+        x_max = (i + 1) * image_size
+        renderer.SetViewport(x_min, 0, x_max, 1)
 
     max_slice = source.GetDimensions()[2] - 1
-    renderWindowInteractor.SetInteractorStyle(
-        myInteractorStyle(renderWindow=renderWindow, max_slice=max_slice, imageReslices=imageReslices))
+    render_window_interactor.SetInteractorStyle(
+        myInteractorStyle(render_window=render_window, max_slice=max_slice, image_reslices=image_reslices))
 
-    renderWindow.Render()
-    renderWindowInteractor.Start()
+    render_window.Render()
+    render_window_interactor.Start()
+
 
 
 class myInteractorStyle(vtk.vtkInteractorStyleImage):
-    def __init__(self, parent=None, renderWindow=None, max_slice=0, imageReslices=None):
-        self.AddObserver("KeyPressEvent", self.keyPressEvent)
+    def __init__(self, parent=None, render_window=None, max_slice=0, image_reslices=None):
+        self.AddObserver("KeyPressEvent", self.key_press_event)
         self.current_slice = 0
         self.max_slice = max_slice
-        self.renderWindow = renderWindow
-        self.imageReslices = imageReslices if imageReslices is not None else []
+        self.renderWindow = render_window
+        self.imageReslices = image_reslices if image_reslices is not None else []
         self.SetInteractionModeToImage3D()
 
-    def keyPressEvent(self, obj, event):
+    def key_press_event(self, obj, event):
         key = self.GetInteractor().GetKeySym()
         if key == 'Up':
             self.next_slice()
@@ -98,12 +102,12 @@ class myInteractorStyle(vtk.vtkInteractorStyleImage):
         self.renderWindow.Render()
 
 
-def setupCamera(renderer, imageActor):
+def setup_camera(renderer, image_actor, length):
     """Configure active camera of renderer by fitting the data"""
 
     camera = renderer.GetActiveCamera()
 
-    source = imageActor.GetMapper().GetInput()
+    source = image_actor.GetMapper().GetInput()
 
     extent = source.GetExtent()
     origin = source.GetOrigin()
@@ -115,7 +119,7 @@ def setupCamera(renderer, imageActor):
     ydimension = (extent[3] - extent[2] + 1) * spacing[1]
 
     d = camera.GetDistance()
-    scale_factor = 0.5 * ydimension
+    scale_factor = ydimension  # Increase the scale_factor
 
     camera.SetParallelScale(scale_factor)
     camera.SetFocalPoint(xcenter, ycenter, zcenter)
@@ -124,4 +128,3 @@ def setupCamera(renderer, imageActor):
 
     renderer.ResetCamera()
     renderer.ResetCameraClippingRange()
-
