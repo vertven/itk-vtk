@@ -1,5 +1,3 @@
-vtk
 itk
-numpy
+vtk
 matplotlib
-plotly
