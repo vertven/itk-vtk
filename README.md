@@ -6,7 +6,9 @@ pip install -r requirements.txt
 
 # VTK Viewer
 
-The project comes with our own VTK viewer. You can find its source code in `vtk_viewer.py.`
+The project comes with our own VTK viewer. You can find its source code in
+`vtk_viewer.py`.
+
 The viewer has some valuable controls:
 - Up and Down arrows: change the slice
 - Mouse wheel: zoom in and out
@@ -15,15 +17,18 @@ The images are displayed in Sagittal view.
 
 # Image Repositioning
 
-The code aligns two brain scans (scan1 and scan2) recorded at various times by
-utilising image registration techniques, such as the Iterative Closest Point
-(ICP) algorithm. This alignment makes it easier to make relevant comparisons and
-analyses, which makes it possible to trace the development and evolution of
-tumours across time. Using intensity-based and deformable registration
-techniques, the algorithm also conducts image repositioning by lining up the
-registered scan (registered_scan2) with the reference scan (scan1). By ensuring
-that the images are in a similar reference space, it is possible to compare
-tumour's growth accurately and evaluate the efficacy of the treatment.
+Multiple images are aligned to a single reference coordinate system through the
+process of image registration, which enables precise image comparison and
+analysis.
+
+The goal is to use image registration to align the two input images, scan1 and
+scan2. The moving picture (scan2) is aligned with the fixed image (scan1) by
+determining the best transformation.
+
+To find such translation transform, we employ a translation-based registration
+technique. The moving picture (scan2) is then transformed using the computed
+transformation, producing a registered image (registered_scan2) that is
+spatially aligned with the fixed image.
 
 # Segmentation
 
@@ -34,20 +39,22 @@ region based on intensity similarity standards from a user-defined seed point.
 To identify the tumour sections for additional analysis, such as volume
 estimation and quantitative measurements, segmentation is used.
 
-We tried to use other filters, such as: ConnectedThresholdImageFilter,
-WatershedImageFilter, NeighborhoodConnectedImageFilter etc...
+We tried to use other filters, such as: `ConnectedThresholdImageFilter`,
+`WatershedImageFilter`, `NeighborhoodConnectedImageFilter` etc...
 
 For `ConnectedThresholdImageFilter` the issue that we encountered is that bones
 and tumors had the same  thresholds, so we couldn't segment the tumor
 without segmenting the bones.
 
-For `WatershedImageFilter,` we couldn't segment the tumor properly.
+For `WatershedImageFilter,` we could not segment the tumor properly.
 We are curious to know if using it was a good idea in the first place.
 
 For `NeighborhoodConnectedImageFilter` the tumor was correctly segmented,
 but the issue was too much information loss.
+
 So we decided to use `ConfidenceConnectedImageFilter` because it was the best
-compromise between the different filters even if the right parameters were harder to find.
+compromise between the different filters even if the right parameters were
+harder to find.
 
 For all the filters we tried to use, we based our parameters by doing
 the segmentation manually using ITK-SNAP.
