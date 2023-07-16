@@ -4,6 +4,15 @@
 pip install -r requirements.txt
 ```
 
+# VTK Viewer
+
+The project comes with our own VTK viewer. You can find its source code in `vtk_viewer.py.`
+The viewer has some valuable controls:
+- Up and Down arrows: change the slice
+- Mouse wheel: zoom in and out
+- Left click and drag: change contrast and brightness
+The images are displayed in Sagittal view.
+
 # Image Repositioning
 
 The code aligns two brain scans (scan1 and scan2) recorded at various times by
@@ -24,6 +33,24 @@ technique based on confidence-connected region growth. The method grows the
 region based on intensity similarity standards from a user-defined seed point.
 To identify the tumour sections for additional analysis, such as volume
 estimation and quantitative measurements, segmentation is used.
+
+We tried to use other filters, such as: ConnectedThresholdImageFilter,
+WatershedImageFilter, NeighborhoodConnectedImageFilter etc...
+
+For `ConnectedThresholdImageFilter` the issue that we encountered is that bones
+and tumors had the same  thresholds, so we couldn't segment the tumor
+without segmenting the bones.
+
+For `WatershedImageFilter,` we couldn't segment the tumor properly.
+We are curious to know if using it was a good idea in the first place.
+
+For `NeighborhoodConnectedImageFilter` the tumor was correctly segmented,
+but the issue was too much information loss.
+So we decided to use `ConfidenceConnectedImageFilter` because it was the best
+compromise between the different filters even if the right parameters were harder to find.
+
+For all the filters we tried to use, we based our parameters by doing
+the segmentation manually using ITK-SNAP.
 
 # Analysis
 
